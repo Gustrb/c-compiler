@@ -1,6 +1,8 @@
+#define TOOLBOX_IMPLEMENTATION
 #include "common.h"
 #include "cli.h"
 #include "frontend/lex.h"
+#include "frontend/parser.h"
 
 int32_t io_load_file_into_memory(const char *filename, char **buffer, size_t *size)
 {
@@ -57,6 +59,13 @@ int32_t main(int32_t argc, char **argv)
 
         if (err) {
             fprintf(stderr, "[Error]: Lexical analysis failed\n");
+            goto cleanup;
+        }
+    } else if (state == S_UP_TO_PARSE) {
+        err = parser_parse_whole_file(buffer, size);
+
+        if (err) {
+            fprintf(stderr, "[Error]: Syntactic analysis failed\n");
             goto cleanup;
         }
     }
