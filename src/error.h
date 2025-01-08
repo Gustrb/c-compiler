@@ -24,4 +24,7 @@
 // Use this error code to indicate that an unknown token was found
 #define ERR_UNKNOWN_TOKEN_FOUND 0x07
 
+// Use this error code to indicate that an invalid syntax was found
+#define ERR_INVALID_SYNTAX      0x08
+
 #endif // __ERROR_H__

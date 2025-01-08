@@ -11,6 +11,8 @@
 
 #include "error.h"
 
+#include "ctoolbox.h"
+
 #define UNUSED(x) (void)(x)
 #define TODO(s) do { fprintf(stderr, "TODO: %s\n", s); exit(ERR_NOT_IMPLEMENTED); } while (0);
 
