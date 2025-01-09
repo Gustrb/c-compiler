@@ -30,4 +30,13 @@
 // Use this error code to indicate that an identifier is too long
 #define ERR_IDENTIFIER_TOO_LONG 0x09
 
+// Use this error code to indicate that an unsupported mov instruction was found
+#define ERR_UNSUPPORTED_MOV_INSTRUCTION 0x0A
+
+// Use this error code to indicate that an output file could not be created
+#define ERR_COULD_NOT_CREATE_OUTPUT_FILE 0x0B
+
+// Use this error code to indicate that gcc could not be executed
+#define ERR_FAILED_TO_EXECUTE_GCC 0x0C
+
 #endif // __ERROR_H__
