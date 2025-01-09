@@ -147,8 +147,13 @@ static int32_t parser_parse_function(lexer_t *lexer, arena_t *arena, program_t *
         return ERR_INVALID_SYNTAX;
     }
 
-    function->start = (char *)token.start;
-    function->end = (char *)token.end;
+    if (token.end - token.start > 255) {
+        fprintf(stderr, "[Error]: Identifier too long at line %zu, column %zu\n", lexer->line, lexer->column);
+        return ERR_IDENTIFIER_TOO_LONG;
+    }
+
+    memcpy(function->identifier, token.start, token.end - token.start);
+    function->identifier[token.end - token.start] = '\0';
 
     err = parser_expect(lexer, TOK_OPEN_PAREN, &token);
     if (err != 0) {
@@ -205,12 +210,6 @@ int32_t parser_parse_whole_file(arena_t *arena, char *buffer, size_t len, progra
         .line = 1,
         .column = 1,
     };
-
-    program = arena_alloc(arena, sizeof(program_t));
-    if (program == NULL) {
-        fprintf(stderr, "[Error]: Unable to allocate memory\n");
-        return ERR_MEMORY_ALLOCATION;
-    }
 
     int32_t err;
     err = parser_parse_function(&l, arena, program);

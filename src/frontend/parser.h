@@ -22,9 +22,7 @@ typedef struct {
 } statement_t;
 
 typedef struct {
-    char *start;
-    char *end;
-
+    char identifier[256];
     statement_t *statement;
 } function_definition_t;
 

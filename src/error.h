@@ -27,4 +27,7 @@
 // Use this error code to indicate that an invalid syntax was found
 #define ERR_INVALID_SYNTAX      0x08
 
+// Use this error code to indicate that an identifier is too long
+#define ERR_IDENTIFIER_TOO_LONG 0x09
+
 #endif // __ERROR_H__
