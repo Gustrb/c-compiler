@@ -198,6 +198,11 @@ static int32_t parser_parse_function(lexer_t *lexer, arena_t *arena, program_t *
 
 int32_t parser_parse_whole_file(arena_t *arena, char *buffer, size_t len, program_t *program)
 {
+    arena_t arena = arena_new();
+    if (arena_new_failed(&arena)) {
+        return ERR_MEMORY_ALLOCATION;
+    }
+
     lexer_t l = {
         .buffer = (uint8_t *)buffer,
         .len = len,
