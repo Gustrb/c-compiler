@@ -116,7 +116,6 @@ int32_t codegen_whole_program(arena_t *arena, char *buffer, size_t size, codegen
     }
 
     err = codegen_function_definition(arena, p.function, &program->function);
-
     if (err) {
         return err;
     }
