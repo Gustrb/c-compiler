@@ -52,6 +52,12 @@ int32_t main(int32_t argc, char **argv)
     err = io_load_file_into_memory(filename, &buffer, &size);
     if (err) return err;
 
+    arena_t arena = arena_new();
+    if (arena_new_failed(&arena)) {
+        fprintf(stderr, "[Error]: Unable to allocate memory\n");
+        return ERR_MEMORY_ALLOCATION;
+    }
+
     if (state == S_UP_TO_LEX) {
         err = lex_whole_file(buffer, size);
 
@@ -59,10 +65,22 @@ int32_t main(int32_t argc, char **argv)
             fprintf(stderr, "[Error]: Lexical analysis failed\n");
             goto cleanup;
         }
+<<<<<<< Updated upstream
+=======
+    } else if (state == S_UP_TO_PARSE) {
+        program_t p;
+        err = parser_parse_whole_file(&arena, buffer, size, &p);
+
+        if (err) {
+            fprintf(stderr, "[Error]: Syntactic analysis failed\n");
+            goto cleanup;
+        }
+>>>>>>> Stashed changes
     }
 
 cleanup:
     free(buffer);
+    arena_delete(&arena);
 
     return err;
 }
