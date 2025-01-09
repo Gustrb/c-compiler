@@ -22,9 +22,7 @@ typedef struct {
 } statement_t;
 
 typedef struct {
-    char *start;
-    char *end;
-
+    char identifier[256];
     statement_t *statement;
 } function_definition_t;
 
@@ -32,6 +30,6 @@ typedef struct {
     function_definition_t *function;
 } program_t;
 
-int32_t parser_parse_whole_file(char *buffer, size_t len);
+int32_t parser_parse_whole_file(arena_t *, char *, size_t, program_t *);
 
 #endif // __PARSER_H__

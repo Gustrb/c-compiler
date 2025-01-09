@@ -34,6 +34,7 @@ static int32_t parser_parse_integer(lexer_t *lexer, arena_t *arena, expression_t
 
     constant_t *constant = arena_alloc(arena, sizeof(constant_t));
     if (constant == NULL) {
+        fprintf(stderr, "[Error]: Unable to allocate memory\n");
         return ERR_MEMORY_ALLOCATION;
     }
 
@@ -58,6 +59,7 @@ static int32_t parser_parse_expression(lexer_t *lexer, arena_t *arena, return_st
 
     expression_t *expression = arena_alloc(arena, sizeof(expression_t));
     if (expression == NULL) {
+        fprintf(stderr, "[Error]: Unable to allocate memory\n");
         return ERR_MEMORY_ALLOCATION;
     }
 
@@ -78,6 +80,7 @@ static int32_t parser_parse_return_statement(lexer_t *lexer, arena_t *arena, sta
 
     return_statement_t *return_statement = arena_alloc(arena, sizeof(return_statement_t));
     if (return_statement == NULL) {
+        fprintf(stderr, "[Error]: Unable to allocate memory\n");
         return ERR_MEMORY_ALLOCATION;
     }
 
@@ -108,6 +111,7 @@ static int32_t parser_parse_statement(lexer_t *lexer, arena_t *arena, function_d
 
     statement_t *statement = arena_alloc(arena, sizeof(statement_t));
     if (statement == NULL) {
+        fprintf(stderr, "[Error]: Unable to allocate memory\n");
         return ERR_MEMORY_ALLOCATION;
     }
 
@@ -127,6 +131,7 @@ static int32_t parser_parse_function(lexer_t *lexer, arena_t *arena, program_t *
 
     function_definition_t *function = arena_alloc(arena, sizeof(function_definition_t));
     if (function == NULL) {
+        fprintf(stderr, "[Error]: Unable to allocate memory\n");
         return ERR_MEMORY_ALLOCATION;
     }
 
@@ -142,8 +147,13 @@ static int32_t parser_parse_function(lexer_t *lexer, arena_t *arena, program_t *
         return ERR_INVALID_SYNTAX;
     }
 
-    function->start = (char *)token.start;
-    function->end = (char *)token.end;
+    if (token.end - token.start > 255) {
+        fprintf(stderr, "[Error]: Identifier too long at line %zu, column %zu\n", lexer->line, lexer->column);
+        return ERR_IDENTIFIER_TOO_LONG;
+    }
+
+    memcpy(function->identifier, token.start, token.end - token.start);
+    function->identifier[token.end - token.start] = '\0';
 
     err = parser_expect(lexer, TOK_OPEN_PAREN, &token);
     if (err != 0) {
@@ -191,13 +201,8 @@ static int32_t parser_parse_function(lexer_t *lexer, arena_t *arena, program_t *
     return 0;
 }
 
-int32_t parser_parse_whole_file(char *buffer, size_t len)
+int32_t parser_parse_whole_file(arena_t *arena, char *buffer, size_t len, program_t *program)
 {
-    arena_t arena = arena_new();
-    if (arena_new_failed(&arena)) {
-        return ERR_MEMORY_ALLOCATION;
-    }
-
     lexer_t l = {
         .buffer = (uint8_t *)buffer,
         .len = len,
@@ -207,14 +212,10 @@ int32_t parser_parse_whole_file(char *buffer, size_t len)
     };
 
     int32_t err;
-    program_t *program = arena_alloc(&arena, sizeof(program_t));
-
-    err = parser_parse_function(&l, &arena, program);
+    err = parser_parse_function(&l, arena, program);
     if (err != 0) {
-        goto cleanup;
+        return err;
     }
 
-cleanup:
-    arena_delete(&arena);
     return err;
 }

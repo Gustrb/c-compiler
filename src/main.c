@@ -3,6 +3,7 @@
 #include "cli.h"
 #include "frontend/lex.h"
 #include "frontend/parser.h"
+#include "frontend/codegen.h"
 
 int32_t io_load_file_into_memory(const char *filename, char **buffer, size_t *size)
 {
@@ -54,6 +55,7 @@ int32_t main(int32_t argc, char **argv)
     err = io_load_file_into_memory(filename, &buffer, &size);
     if (err) return err;
 
+
     if (state == S_UP_TO_LEX) {
         err = lex_whole_file(buffer, size);
 
@@ -62,11 +64,36 @@ int32_t main(int32_t argc, char **argv)
             goto cleanup;
         }
     } else if (state == S_UP_TO_PARSE) {
-        err = parser_parse_whole_file(buffer, size);
+        arena_t arena = arena_new();
+        if (arena_new_failed(&arena)) {
+            fprintf(stderr, "[Error]: Unable to allocate memory\n");
+            err = ERR_MEMORY_ALLOCATION;
+            goto cleanup;        
+        }
 
+        program_t p = {0};
+        err = parser_parse_whole_file(&arena, buffer, size, &p);
+        arena_delete(&arena);
         if (err) {
             fprintf(stderr, "[Error]: Syntactic analysis failed\n");
             goto cleanup;
+        }
+    } else if (state == S_UP_TO_CODEGEN) {
+        arena_t arena = arena_new();
+        if (arena_new_failed(&arena)) {
+            fprintf(stderr, "[Error]: Unable to allocate memory\n");
+            err = ERR_MEMORY_ALLOCATION;
+            goto cleanup;        
+        }
+
+        codegen_program_t p = {0};
+        err = codegen_whole_program(&arena, buffer, size, &p);
+        arena_delete(&arena);
+        if (err) {
+            fprintf(stderr, "[Error]: Code generation failed\n");
+            goto cleanup;
+        } else {
+            fprintf(stderr, "[Info]: Code generation successful\n");
         }
     }
 
