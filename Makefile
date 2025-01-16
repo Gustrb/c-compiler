@@ -12,3 +12,9 @@ test-codegen: build
 
 test-chapter-1: build
 	./writing-a-c-compiler-tests/test_compiler ./dist/main --chapter 1
+
+build-zig:
+	zig build-exe ./zig-rewrite/main.zig
+
+test-lex-zig: build-zig
+	./writing-a-c-compiler-tests/test_compiler ./zig-rewrite/main --chapter 1 --stage lex
