@@ -17,4 +17,7 @@ build-zig:
 	zig build-exe ./zig-rewrite/main.zig
 
 test-lex-zig: build-zig
-	./writing-a-c-compiler-tests/test_compiler ./zig-rewrite/main --chapter 1 --stage lex
+	./writing-a-c-compiler-tests/test_compiler ./main --chapter 1 --stage lex
+
+test-parser-zig: build-zig
+	./writing-a-c-compiler-tests/test_compiler ./main --chapter 1 --stage parse

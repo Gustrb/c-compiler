@@ -1,6 +1,10 @@
 const std = @import("std");
 const cli = @import("cli.zig");
 const lex = @import("lex.zig");
+
+const Parser = @import("parser.zig").Parser;
+const ParseError = @import("parser.zig").ParseError;
+
 const io = std.io;
 const process = std.process;
 
@@ -55,6 +59,24 @@ pub fn main() !void {
     if (cliArgs.state == cli.State.upToLex) {
         _ = lex.Lexer.lexWholeFile(allocator, buffer) catch |err| {
             try stderr.print("[Error]: Failed to lex file: {s}, {}\n", .{ cliArgs.inputFilepath, err });
+            try process.exit(1);
+        };
+    }
+
+    if (cliArgs.state == cli.State.upToParse) {
+        var parser = Parser.init(allocator, buffer);
+        _ = parser.parse() catch |err| {
+            switch (err) {
+                ParseError.UnexpectedToken => {
+                    try stderr.print("[Error]: Unexpected token\n", .{});
+                },
+                ParseError.OutOfMemory => {
+                    try stderr.print("[Error]: Out of memory\n", .{});
+                },
+                ParseError.FunctionNameTooLong => {
+                    try stderr.print("[Error]: Function name too long\n", .{});
+                },
+            }
             try process.exit(1);
         };
     }

@@ -1,11 +1,17 @@
 const std = @import("std");
 const ArrayList = std.ArrayList;
 
+pub const FileLoc = struct {
+    line: usize,
+    col: usize,
+};
+
 pub const Token = struct {
     tag: Tag,
     loc: Loc,
 
     pub const Tag = enum {
+        invalid,
         eof,
 
         comment,
@@ -29,7 +35,7 @@ pub const Token = struct {
     };
 };
 
-pub const Tokens = ArrayList(Token);
+pub const TokenList = ArrayList(Token);
 
 pub const LexError = error{
     UnsupportedToken,
@@ -69,11 +75,11 @@ pub const Lexer = struct {
         return Lexer{ .buffer = buffer, .index = src_start };
     }
 
-    pub fn peek(self: *Self) u8 {
+    fn peek(self: *Self) u8 {
         return self.buffer[self.index];
     }
 
-    pub fn peekAhead(self: *Self, ahead: usize) u8 {
+    fn peekAhead(self: *Self, ahead: usize) u8 {
         return self.buffer[self.index + ahead];
     }
 
@@ -192,9 +198,30 @@ pub const Lexer = struct {
         return LexError.UnsupportedToken;
     }
 
-    pub fn lexWholeFile(allocator: std.mem.Allocator, data: []const u8) LexError!Tokens {
+    pub fn getErrorLineAndCol(self: *Self, tok: Token) FileLoc {
+        var line: usize = 1;
+        var col: usize = 1;
+        var i: usize = 0;
+
+        while (true) : (i += 1) {
+            if (i == tok.loc.start) {
+                break;
+            }
+
+            if (self.buffer[i] == '\n') {
+                line += 1;
+                col = 1;
+            } else {
+                col += 1;
+            }
+        }
+
+        return FileLoc{ .line = line, .col = col };
+    }
+
+    pub fn lexWholeFile(allocator: std.mem.Allocator, data: []const u8) LexError!TokenList {
         var lexer = Lexer.init(data);
-        var tokens = Tokens.init(allocator);
+        var tokens = TokenList.init(allocator);
 
         while (true) {
             const token = try lexer.next();
