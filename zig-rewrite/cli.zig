@@ -31,6 +31,8 @@ pub fn printUsage() !void {
 }
 
 pub const CLIFlags = struct {
+    const Self = @This();
+
     state: State,
     inputFilepath: []const u8,
 };
@@ -67,4 +69,41 @@ pub fn parseCliArgs(args: [][:0]u8) CLIError!CLIFlags {
     }
 
     return CLIFlags{ .state = state, .inputFilepath = args[2] };
+}
+
+pub fn findAssemblyOutputPath(inputPath: []const u8, allocator: std.mem.Allocator) std.mem.Allocator.Error![]const u8 {
+    // Here, we need to find the last . and replace it with .s
+    var i: usize = inputPath.len - 1;
+    while (i > 0) {
+        if (inputPath[i] == '.') {
+            break;
+        }
+
+        i -= 1;
+    }
+
+    // return slice from 0 to i
+    const outpath = inputPath[0..i];
+    const outpathWithExtension = try allocator.alloc(u8, outpath.len + 2);
+
+    @memcpy(outpathWithExtension[0..outpath.len], outpath);
+
+    outpathWithExtension[outpath.len] = '.';
+    outpathWithExtension[outpath.len + 1] = 's';
+    return outpathWithExtension;
+}
+
+pub fn findBinaryOutputPath(inputPath: []const u8) []const u8 {
+    // Find last .
+    var i: usize = inputPath.len - 1;
+    while (i > 0) {
+        if (inputPath[i] == '.') {
+            break;
+        }
+
+        i -= 1;
+    }
+
+    // return slice from 0 to i
+    return inputPath[0..i];
 }

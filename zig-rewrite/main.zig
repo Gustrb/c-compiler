@@ -8,6 +8,8 @@ const CodegenError = @import("codegen.zig").CodegenError;
 const Parser = @import("parser.zig").Parser;
 const ParseError = @import("parser.zig").ParseError;
 
+const x86_64 = @import("backend/x86_64.zig");
+
 const io = std.io;
 const process = std.process;
 
@@ -98,5 +100,71 @@ pub fn main() !void {
             }
             try process.exit(1);
         };
+    }
+
+    if (cliArgs.state == cli.State.upToAssembly or cliArgs.state == cli.State.upToBinary) {
+        const parser = Parser.init(allocator, buffer);
+        var codegen = Codegen.init(allocator, parser);
+        const program = codegen.genProgram() catch |err| {
+            switch (err) {
+                CodegenError.FailedToParse => {
+                    try stderr.print("[Error]: Failed to parse\n", .{});
+                },
+                CodegenError.OutOfMemory => {
+                    try stderr.print("[Error]: Out of memory\n", .{});
+                },
+            }
+            try process.exit(1);
+        };
+
+        const output = cli.findAssemblyOutputPath(cliArgs.inputFilepath, allocator) catch {
+            try stderr.print("[Error]: Failed to find assembly output path\n", .{});
+            try process.exit(1);
+        };
+        defer allocator.free(output);
+
+        var asmGenerator: x86_64.X86_64 = .{ .allocator = allocator };
+        asmGenerator.x86_64GenAssembly(output, program) catch |err| {
+            switch (err) {
+                x86_64.AssemblyGenerationError.FailedToCreateOutputFile => {
+                    try stderr.print("[Error]: Failed to create output file\n", .{});
+                },
+                x86_64.AssemblyGenerationError.FaileToWriteOutputFile => {
+                    try stderr.print("[Error]: Failed to write output file\n", .{});
+                },
+                x86_64.AssemblyGenerationError.InvalidMovAdressingMode => {
+                    try stderr.print("[Error]: Invalid mov addressing mode\n", .{});
+                },
+                x86_64.AssemblyGenerationError.InvalidRegister => {
+                    try stderr.print("[Error]: Invalid register\n", .{});
+                },
+            }
+            try process.exit(1);
+        };
+
+        if (cliArgs.state == cli.State.upToBinary) {
+            const binaryOutput = cli.findBinaryOutputPath(cliArgs.inputFilepath);
+
+            const argv = [_][]const u8{ "gcc", "-o", binaryOutput, output };
+
+            // int32_t err = execvp("gcc", args);
+            const proc = process.Child.run(.{
+                .argv = &argv,
+                .allocator = allocator,
+            }) catch {
+                try stderr.print("[Error]: Failed to run gcc\n", .{});
+                try process.exit(1);
+            };
+
+            std.debug.print("{s}", .{proc.stderr});
+
+            defer allocator.free(proc.stderr);
+            defer allocator.free(proc.stdout);
+
+            io.getStdOut().writer().print("Successfully compiled\n", .{}) catch {
+                try stderr.print("[Error]: Failed to write to stdout\n", .{});
+                try process.exit(1);
+            };
+        }
     }
 }

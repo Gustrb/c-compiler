@@ -5,22 +5,22 @@ const Parser = @import("parser.zig").Parser;
 const ParseError = @import("parser.zig").ParseError;
 const Ast = @import("parser.zig");
 
-pub const MovInstruction = struct {
-    pub const Operand = struct {
-        pub const Tag = enum {
-            register,
-            immediate,
-        };
-
-        pub const Value = union {
-            register: u64,
-            immediate: u64,
-        };
-
-        tag: Tag,
-        value: Value,
+pub const Operand = struct {
+    pub const Tag = enum {
+        register,
+        immediate,
     };
 
+    pub const Value = union {
+        register: u64,
+        immediate: u64,
+    };
+
+    tag: Tag,
+    value: Value,
+};
+
+pub const MovInstruction = struct {
     src: Operand,
     dst: Operand,
 };
@@ -70,44 +70,54 @@ pub const Codegen = struct {
         };
     }
 
-    fn emitRetInstruction(instructions: *InstructionList) CodegenError!void {
-        var ret = RetInstruction{};
+    fn emitRetInstruction(self: *Self, instructions: *InstructionList) CodegenError!void {
+        const ret = self.allocator.create(RetInstruction) catch {
+            return CodegenError.OutOfMemory;
+        };
 
-        instructions.append(Instruction{ .tag = Instruction.Tag.ret, .value = Instruction.Value{ .retInstruction = &ret } }) catch {
+        instructions.append(Instruction{ .tag = Instruction.Tag.ret, .value = Instruction.Value{ .retInstruction = ret } }) catch {
             return CodegenError.OutOfMemory;
         };
     }
 
-    fn emitMovInstruction(src: MovInstruction.Operand, dst: MovInstruction.Operand, instructions: *InstructionList) CodegenError!void {
-        var mov = MovInstruction{
-            .src = src,
-            .dst = dst,
+    fn emitMovInstruction(self: *Self, src: Operand, dst: Operand, instructions: *InstructionList) CodegenError!void {
+        var mov = self.allocator.create(MovInstruction) catch {
+            return CodegenError.OutOfMemory;
         };
 
-        instructions.append(Instruction{ .tag = Instruction.Tag.mov, .value = Instruction.Value{ .moveInstruction = &mov } }) catch {
+        mov.src = src;
+        mov.dst = dst;
+
+        instructions.append(Instruction{ .tag = Instruction.Tag.mov, .value = Instruction.Value{ .moveInstruction = mov } }) catch {
             return CodegenError.OutOfMemory;
         };
     }
 
-    fn genExpression(expression: *Ast.Expression, instructions: *InstructionList) CodegenError!void {
+    fn genExpression(self: *Self, expression: *Ast.Expression, instructions: *InstructionList) CodegenError!void {
         switch (expression.tag) {
             Ast.Expression.Tag.constant => {
                 const constant = expression.value.Constant;
-                const src = MovInstruction.Operand{ .tag = MovInstruction.Operand.Tag.immediate, .value = MovInstruction.Operand.Value{ .immediate = constant.value } };
-                const dst = MovInstruction.Operand{ .tag = MovInstruction.Operand.Tag.register, .value = MovInstruction.Operand.Value{ .register = 0 } };
+                const src = Operand{ .tag = Operand.Tag.immediate, .value = Operand.Value{ .immediate = constant.value } };
+                const dst = Operand{ .tag = Operand.Tag.register, .value = Operand.Value{ .register = 0 } };
 
-                try Self.emitMovInstruction(src, dst, instructions);
+                try self.emitMovInstruction(src, dst, instructions);
+                self.allocator.destroy(constant);
             },
         }
+
+        self.allocator.destroy(expression);
     }
 
-    fn genStatement(statement: *Ast.Statement, instructions: *InstructionList) CodegenError!void {
+    fn genStatement(self: *Self, statement: *Ast.Statement, instructions: *InstructionList) CodegenError!void {
         switch (statement.tag) {
             Ast.Statement.Tag.Return => {
-                try Self.genExpression(statement.value.Return.expression, instructions);
-                try Self.emitRetInstruction(instructions);
+                try self.genExpression(statement.value.Return.expression, instructions);
+                try self.emitRetInstruction(instructions);
+                self.allocator.destroy(statement.value.Return);
             },
         }
+
+        self.allocator.destroy(statement);
     }
 
     fn genFunctionDefinition(self: *Self, functionDefinition: *Ast.FunctionDefinition) CodegenError!FunctionDefinition {
@@ -116,7 +126,8 @@ pub const Codegen = struct {
             .instructions = InstructionList.init(self.allocator),
         };
 
-        try Self.genStatement(functionDefinition.stmt, &fdef.instructions);
+        try self.genStatement(functionDefinition.stmt, &fdef.instructions);
+        self.allocator.destroy(functionDefinition);
         return fdef;
     }
 
