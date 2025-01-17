@@ -1,3 +1,7 @@
 dist/*
 writing-a-c-compiler-tests/*s
 .vscode/*
+*.o
+./zig-cache/*
+
+main
