@@ -21,3 +21,6 @@ test-lex-zig: build-zig
 
 test-parser-zig: build-zig
 	./writing-a-c-compiler-tests/test_compiler ./main --chapter 1 --stage parse
+
+test-codegen-zig: build-zig
+	./writing-a-c-compiler-tests/test_compiler ./main --chapter 1 --stage codegen

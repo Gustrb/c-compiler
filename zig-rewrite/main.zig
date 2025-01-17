@@ -2,6 +2,9 @@ const std = @import("std");
 const cli = @import("cli.zig");
 const lex = @import("lex.zig");
 
+const Codegen = @import("codegen.zig").Codegen;
+const CodegenError = @import("codegen.zig").CodegenError;
+
 const Parser = @import("parser.zig").Parser;
 const ParseError = @import("parser.zig").ParseError;
 
@@ -75,6 +78,22 @@ pub fn main() !void {
                 },
                 ParseError.FunctionNameTooLong => {
                     try stderr.print("[Error]: Function name too long\n", .{});
+                },
+            }
+            try process.exit(1);
+        };
+    }
+
+    if (cliArgs.state == cli.State.upToCodegen) {
+        const parser = Parser.init(allocator, buffer);
+        var codegen = Codegen.init(allocator, parser);
+        _ = codegen.genProgram() catch |err| {
+            switch (err) {
+                CodegenError.FailedToParse => {
+                    try stderr.print("[Error]: Failed to parse\n", .{});
+                },
+                CodegenError.OutOfMemory => {
+                    try stderr.print("[Error]: Out of memory\n", .{});
                 },
             }
             try process.exit(1);
