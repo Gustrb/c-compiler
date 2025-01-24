@@ -62,10 +62,12 @@ pub fn main() !void {
     defer allocator.free(buffer);
 
     if (cliArgs.state == cli.State.upToLex) {
-        _ = lex.Lexer.lexWholeFile(allocator, buffer) catch |err| {
+        var tokens = lex.Lexer.lexWholeFile(allocator, buffer) catch |err| {
             try stderr.print("[Error]: Failed to lex file: {s}, {}\n", .{ cliArgs.inputFilepath, err });
             try process.exit(1);
         };
+
+        defer tokens.deinit();
     }
 
     if (cliArgs.state == cli.State.upToParse) {

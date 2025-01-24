@@ -65,11 +65,6 @@ pub const Lexer = struct {
     buffer: []const u8,
     index: usize,
 
-    /// For debugging purposes
-    pub fn dump(self: *Self, token: *const Token) void {
-        std.debug.print("{s} \"{s}\"\n", .{ @tagName(token.tag), self.buffer[token.loc.start..token.loc.end] });
-    }
-
     pub fn init(buffer: []const u8) Self {
         const src_start: usize = if (std.mem.startsWith(u8, buffer, "\xEF\xBB\xBF")) 3 else 0;
         return Lexer{ .buffer = buffer, .index = src_start };
@@ -95,104 +90,152 @@ pub const Lexer = struct {
         return Token.Tag.identifier;
     }
 
-    // TODO: Rewrite this to be a proper state machine
     pub fn next(self: *Self) LexError!Token {
-        while (self.index < self.buffer.len and std.ascii.isWhitespace(self.buffer[self.index])) {
-            self.index += 1;
-        }
+        const State = enum {
+            Start,
 
-        var token: Token = .{
-            .tag = undefined,
-            .loc = .{ .start = self.index, .end = undefined },
+            // Single line comment
+            Slash,
+            SingleLineComment,
+
+            MultiLineComment,
+            MultiLineCommentAsterisk,
+
+            Identifier,
+            NumericLiteral,
         };
 
-        if (self.index + 1 < self.buffer.len and self.peek() == '/' and self.peekAhead(1) == '/') {
-            token.tag = .comment;
-            while (self.index < self.buffer.len and self.peek() != '\n') {
-                self.index += 1;
-            }
+        var currState = State.Start;
+        var start = self.index;
+        var end = self.index;
 
-            token.loc.end = self.index;
-            return token;
-        }
-
-        if (self.index + 1 < self.buffer.len and self.peek() == '/' and self.peekAhead(1) == '*') {
-            token.tag = .comment;
-            while (self.index < self.buffer.len) {
-                if (self.peek() == '*' and self.peekAhead(1) == '/') {
-                    self.index += 2;
-                    break;
-                }
-                self.index += 1;
-            }
-
+        while (true) {
             if (self.index == self.buffer.len) {
-                return LexError.UnterminatedMultilineComment;
+                return Token{ .tag = Token.Tag.eof, .loc = .{ .start = start, .end = end } };
             }
 
-            token.loc.end = self.index;
-            return token;
-        }
-
-        if (self.index >= self.buffer.len) {
-            token.tag = .eof;
-            token.loc.end = self.index;
-            return token;
-        }
-
-        switch (self.peek()) {
-            '(' => {
-                token.tag = .openParen;
-                self.index += 1;
-                return token;
-            },
-            ')' => {
-                token.tag = .closeParen;
-                self.index += 1;
-                return token;
-            },
-            '{' => {
-                token.tag = .openBrace;
-                self.index += 1;
-                return token;
-            },
-            '}' => {
-                token.tag = .closeBrace;
-                self.index += 1;
-                return token;
-            },
-            ';' => {
-                token.tag = .semicolon;
-                self.index += 1;
-                return token;
-            },
-            '0'...'9' => {
-                token.tag = .numberLiteral;
-                while (self.index < self.buffer.len and isDigit(self.peek())) {
-                    self.index += 1;
-                }
-
-                if (self.index < self.buffer.len and isAlpha(self.peek())) {
-                    return LexError.InvalidConstant;
-                }
-
-                token.loc.end = self.index;
-                return token;
-            },
-            'a'...'z', 'A'...'Z', '_' => {
-                while (self.index < self.buffer.len and (isAlphanumeric(self.peek()) or self.peek() == '_')) {
-                    self.index += 1;
-                }
-
-                token.tag = Lexer.getIdentifierTag(self.buffer[token.loc.start..self.index]);
-                token.loc.end = self.index;
-                return token;
-            },
-
-            else => {
-                self.index += 1;
-                return LexError.UnsupportedToken;
-            },
+            const c = self.peek();
+            switch (currState) {
+                .Start => {
+                    switch (c) {
+                        'a'...'z', 'A'...'Z' => {
+                            currState = State.Identifier;
+                            start = self.index;
+                        },
+                        '0'...'9' => {
+                            currState = State.NumericLiteral;
+                            start = self.index;
+                        },
+                        '(' => {
+                            self.index += 1;
+                            return Token{ .tag = Token.Tag.openParen, .loc = .{ .start = start, .end = start + 1 } };
+                        },
+                        ')' => {
+                            self.index += 1;
+                            return Token{ .tag = Token.Tag.closeParen, .loc = .{ .start = start, .end = start + 1 } };
+                        },
+                        '{' => {
+                            self.index += 1;
+                            return Token{ .tag = Token.Tag.openBrace, .loc = .{ .start = start, .end = start + 1 } };
+                        },
+                        '}' => {
+                            self.index += 1;
+                            return Token{ .tag = Token.Tag.closeBrace, .loc = .{ .start = start, .end = start + 1 } };
+                        },
+                        ';' => {
+                            self.index += 1;
+                            return Token{ .tag = Token.Tag.semicolon, .loc = .{ .start = start, .end = start + 1 } };
+                        },
+                        '/' => {
+                            self.index += 1;
+                            currState = State.Slash;
+                        },
+                        ' ', '\t', '\n', '\r' => {
+                            self.index += 1;
+                            start = self.index;
+                        },
+                        else => {
+                            self.index += 1;
+                            return Token{ .tag = Token.Tag.invalid, .loc = .{ .start = start, .end = end } };
+                        },
+                    }
+                },
+                .Identifier => {
+                    switch (c) {
+                        'a'...'z', 'A'...'Z', '0'...'9', '_' => {
+                            self.index += 1;
+                        },
+                        else => {
+                            end = self.index;
+                            return Token{ .tag = getIdentifierTag(self.buffer[start..end]), .loc = .{ .start = start, .end = end } };
+                        },
+                    }
+                },
+                .NumericLiteral => {
+                    switch (c) {
+                        '0'...'9' => {
+                            self.index += 1;
+                        },
+                        'a'...'z', 'A'...'Z', '_', '@' => {
+                            return Token{ .tag = Token.Tag.invalid, .loc = .{ .start = start, .end = end } };
+                        },
+                        else => {
+                            end = self.index;
+                            return Token{ .tag = Token.Tag.numberLiteral, .loc = .{ .start = start, .end = end } };
+                        },
+                    }
+                },
+                .Slash => {
+                    switch (c) {
+                        '/' => {
+                            currState = State.SingleLineComment;
+                            self.index += 1;
+                        },
+                        '*' => {
+                            currState = State.MultiLineComment;
+                            self.index += 1;
+                        },
+                        else => {
+                            self.index += 1;
+                            return Token{ .tag = Token.Tag.invalid, .loc = .{ .start = start, .end = end } };
+                        },
+                    }
+                },
+                .SingleLineComment => {
+                    switch (c) {
+                        '\n' => {
+                            self.index += 1;
+                            currState = State.Start;
+                        },
+                        else => {
+                            self.index += 1;
+                        },
+                    }
+                },
+                .MultiLineComment => {
+                    switch (c) {
+                        '*' => {
+                            currState = State.MultiLineCommentAsterisk;
+                            self.index += 1;
+                        },
+                        else => {
+                            self.index += 1;
+                        },
+                    }
+                },
+                .MultiLineCommentAsterisk => {
+                    switch (c) {
+                        '/' => {
+                            self.index += 1;
+                            currState = State.Start;
+                        },
+                        else => {
+                            self.index += 1;
+                            currState = State.MultiLineComment;
+                        },
+                    }
+                },
+            }
         }
 
         return LexError.UnsupportedToken;
@@ -229,6 +272,10 @@ pub const Lexer = struct {
                 break;
             }
 
+            if (token.tag == Token.Tag.invalid) {
+                return LexError.UnsupportedToken;
+            }
+
             const token_copy = Token{ .tag = token.tag, .loc = .{ .start = token.loc.start, .end = token.loc.end } };
             tokens.append(token_copy) catch {
                 return LexError.OutOfMemory;
@@ -238,3 +285,38 @@ pub const Lexer = struct {
         return tokens;
     }
 };
+
+fn tokenEquals(a: Token, b: Token) bool {
+    return a.tag == b.tag and a.loc.start == b.loc.start and a.loc.end == b.loc.end;
+}
+
+test "expect getErrorLineAndCol to be able to find line and column of a token" {
+    const testing = std.testing;
+
+    const program = "int main() { return 0; }";
+    const tokens = Lexer.lexWholeFile(std.heap.page_allocator, program) catch |err| {
+        std.debug.print("Error: {s}\n", .{@errorName(err)});
+        return;
+    };
+
+    defer tokens.deinit();
+
+    var lexer = Lexer.init(program);
+    const token = tokens.items[5];
+    const loc = lexer.getErrorLineAndCol(token);
+
+    try testing.expect(loc.line == 1);
+    try testing.expect(loc.col == 14);
+}
+
+test "expect lexing empty string to return empty list" {
+    const testing = std.testing;
+
+    const tokens = Lexer.lexWholeFile(std.heap.page_allocator, "") catch |err| {
+        std.debug.print("Error: {s}\n", .{@errorName(err)});
+        return;
+    };
+    defer tokens.deinit();
+
+    try testing.expect(tokens.items.len == 0);
+}
