@@ -50,14 +50,7 @@ pub const Parser = struct {
     }
 
     fn nextToken(self: *Self) lex.LexError!Token {
-        while (true) {
-            const token = try self.lexer.next();
-            if (token.tag == TokenTag.comment) {
-                continue;
-            }
-
-            return token;
-        }
+        return self.lexer.next();
     }
 
     fn parserExpect(self: *Self, tag: TokenTag, processedToken: *Token) ParseError!void {

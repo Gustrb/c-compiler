@@ -164,6 +164,10 @@ pub const Lexer = struct {
                     switch (c) {
                         'a'...'z', 'A'...'Z', '0'...'9', '_' => {
                             self.index += 1;
+                            if (self.index == self.buffer.len) {
+                                end = self.index;
+                                return Token{ .tag = getIdentifierTag(self.buffer[start..end]), .loc = .{ .start = start, .end = end } };
+                            }
                         },
                         else => {
                             end = self.index;
@@ -175,6 +179,11 @@ pub const Lexer = struct {
                     switch (c) {
                         '0'...'9' => {
                             self.index += 1;
+
+                            if (self.index == self.buffer.len) {
+                                end = self.index;
+                                return Token{ .tag = Token.Tag.numberLiteral, .loc = .{ .start = start, .end = end } };
+                            }
                         },
                         'a'...'z', 'A'...'Z', '_', '@' => {
                             return Token{ .tag = Token.Tag.invalid, .loc = .{ .start = start, .end = end } };
@@ -204,8 +213,8 @@ pub const Lexer = struct {
                 .SingleLineComment => {
                     switch (c) {
                         '\n' => {
-                            self.index += 1;
                             currState = State.Start;
+                            self.index += 1;
                         },
                         else => {
                             self.index += 1;
@@ -319,4 +328,18 @@ test "expect lexing empty string to return empty list" {
     defer tokens.deinit();
 
     try testing.expect(tokens.items.len == 0);
+}
+
+test "expect handling comments correctly" {
+    const testing = std.testing;
+    const program = "// comment\nidentifier";
+    const tokens = Lexer.lexWholeFile(std.heap.page_allocator, program) catch |err| {
+        std.debug.print("Error: {s}\n", .{@errorName(err)});
+        return;
+    };
+
+    defer tokens.deinit();
+
+    try testing.expect(tokens.items.len == 1);
+    try testing.expect(tokens.items[tokens.items.len - 1].tag == Token.Tag.identifier);
 }
